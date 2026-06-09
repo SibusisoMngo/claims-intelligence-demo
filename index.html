@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Agents as a Service — Claims Recovery Intelligence</title>
+<style>
+  :root{
+    --bg:#0B0F1A; --surface:#121826; --surface2:#171E2E; --inset:#0E1320;
+    --border:rgba(255,255,255,.08); --border2:rgba(255,255,255,.05);
+    --text:#E8EBF2; --text2:#9BA3B4; --text3:#69707F; --text4:#454c5a;
+    --accent:#6366F1; --accent2:#818cf8; --accent-soft:rgba(99,102,241,.14);
+    --crit:#F87171; --crit-bg:rgba(248,113,113,.12);
+    --high:#FB923C; --high-bg:rgba(251,146,60,.12);
+    --med:#FBBF24; --med-bg:rgba(251,191,36,.10);
+    --ok:#34D399; --ok-bg:rgba(52,211,153,.12);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    background:radial-gradient(900px 500px at 78% -8%, rgba(99,102,241,.10), transparent 60%),var(--bg);
+    color:var(--text);
+    font-family:-apple-system,"SF Pro Text","Segoe UI",Inter,system-ui,sans-serif;
+    font-feature-settings:"tnum" 1; -webkit-font-smoothing:antialiased; letter-spacing:-.01em;
+  }
+  .tnum{font-variant-numeric:tabular-nums}
+  .mono{font-family:"SF Mono",ui-monospace,"Roboto Mono",monospace}
+  button{font-family:inherit}
+  .app{display:grid;grid-template-columns:240px 1fr;min-height:100vh}
+
+  /* sidebar */
+  .side{border-right:1px solid var(--border);padding:20px 14px;display:flex;flex-direction:column;gap:4px;background:linear-gradient(180deg,rgba(255,255,255,.015),transparent)}
+  .brand{display:flex;align-items:center;gap:10px;padding:6px 8px 18px}
+  .logo{display:grid;place-items:center;padding:3px;border-radius:9px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);box-shadow:inset 0 1px 1px rgba(255,255,255,.06)}
+  .logo .plate{height:20px;display:grid;place-items:center;padding:3px 6px;border-radius:6px;background:#fbfbfd;box-shadow:0 6px 16px -6px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.8)}
+  .logo img{height:100%;width:auto;display:block;object-fit:contain}
+  .brand b{font-size:14.5px;letter-spacing:.02em}
+  .brand span{display:block;font-size:10.5px;color:var(--text3);letter-spacing:.04em;margin-top:1px}
+  .nav{font-size:13px;color:var(--text2);padding:9px 10px;border-radius:8px;display:flex;align-items:center;gap:10px;cursor:pointer;border:none;background:transparent;width:100%;text-align:left}
+  .nav .i{width:15px;text-align:center;opacity:.8}
+  .nav.active{background:var(--accent-soft);color:#c7cbff;font-weight:600}
+  .nav.active .i{opacity:1}
+  .divider{height:1px;background:var(--border);margin:10px 4px}
+  .me{margin-top:auto;display:flex;align-items:center;gap:10px;padding:8px;border-radius:10px;background:var(--surface)}
+  .me .av{width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,#334155,#1e293b);display:grid;place-items:center;font-size:12px;color:#cbd5e1;font-weight:600}
+  .me b{font-size:12.5px;display:block}
+  .me span{font-size:11px;color:var(--text3)}
+
+  /* main */
+  .main{display:flex;flex-direction:column;min-width:0}
+  .topbar{height:56px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:16px;padding:0 28px;background:rgba(11,15,26,.6);backdrop-filter:blur(8px)}
+  .topbar .t{font-size:13px;color:var(--text3);background:none;border:none;cursor:pointer}
+  .search{margin-left:auto;display:flex;align-items:center;gap:8px;background:var(--inset);border:1px solid var(--border);border-radius:9px;padding:7px 11px;font-size:12.5px;color:var(--text3);min-width:230px}
+  .kbd{margin-left:auto;font-size:10.5px;color:var(--text4);border:1px solid var(--border);border-radius:5px;padding:1px 5px}
+  .pill{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:600;letter-spacing:.05em;color:var(--med);background:var(--med-bg);border:1px solid rgba(251,191,36,.25);padding:5px 10px;border-radius:999px}
+  .dot{width:7px;height:7px;border-radius:50%;background:currentColor;box-shadow:0 0 8px currentColor}
+  .content{padding:26px 28px 0;overflow:auto;flex:1}
+
+  .h1{font-size:25px;font-weight:650;letter-spacing:-.025em}
+  .scanline{font-size:12px;color:var(--text3);margin-top:3px}
+  .standfirst{margin:18px 0 16px;font-size:17.5px;line-height:1.55;color:var(--text);font-weight:420;max-width:900px;letter-spacing:-.015em}
+  .standfirst b{font-weight:650;color:#fff}
+  .standfirst .money{color:var(--accent2);font-weight:650}
+
+  .triage{display:flex;align-items:center;font-size:12px;color:var(--text2);background:var(--surface);border:1px solid var(--border);border-radius:11px;padding:11px 0;margin-bottom:20px;flex-wrap:wrap}
+  .triage .seg{display:flex;align-items:center;gap:7px;padding:0 16px;border-right:1px solid var(--border)}
+  .triage .seg:last-child{border-right:none}
+  .triage .seg b{color:var(--text);font-weight:600}
+  .triage .seg.crit b{color:var(--crit)}
+
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+  .card{background:linear-gradient(180deg,rgba(255,255,255,.022),transparent),var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px}
+  .klabel{font-size:10.5px;font-weight:650;letter-spacing:.09em;color:var(--text3);text-transform:uppercase}
+  .kval{font-size:38px;font-weight:650;letter-spacing:-.035em;line-height:1.05;margin-top:11px}
+  .kval.accent{color:#fff}
+  .ksub{font-size:12px;color:var(--text3);margin-top:7px}
+  .bar{height:5px;border-radius:3px;background:var(--inset);margin-top:14px;overflow:hidden}
+  .bar i{display:block;height:100%;border-radius:3px;background:linear-gradient(90deg,var(--accent),var(--accent2))}
+  .bar.green i{background:linear-gradient(90deg,#059669,var(--ok))}
+  .conf{font-size:10.5px;color:var(--text3);margin-top:6px;display:flex;justify-content:space-between}
+
+  .sectlabel{margin-top:26px;font-size:13px;font-weight:600;color:var(--text);display:flex;justify-content:space-between;align-items:center}
+  .sectlabel span{font-size:11px;color:var(--text3);font-weight:500}
+
+  .catgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:14px}
+  .catcard{text-align:left;cursor:pointer;background:linear-gradient(180deg,rgba(255,255,255,.022),transparent),var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px;transition:border-color .15s,transform .15s}
+  .catcard:hover{border-color:rgba(99,102,241,.5);transform:translateY(-2px)}
+  .catcard .glyph{font-size:18px;color:var(--accent2)}
+  .catcard .cname{font-size:13.5px;font-weight:600;color:var(--text);margin-top:12px;line-height:1.25}
+  .catcard .cval{font-size:24px;font-weight:650;letter-spacing:-.03em;margin-top:8px;color:#fff}
+  .catcard .csub{font-size:11.5px;color:var(--text3);margin-top:4px}
+
+  .panel{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px 18px 8px;margin:22px 0 28px}
+  .ptitle{font-size:13px;font-weight:600;color:var(--text);margin-bottom:16px;display:flex;justify-content:space-between;align-items:center}
+  .ptitle .sort{font-size:11px;color:var(--text3);font-weight:500}
+
+  table{width:100%;border-collapse:collapse;font-size:12.5px}
+  thead th{text-align:left;font-size:10px;font-weight:650;letter-spacing:.07em;text-transform:uppercase;color:var(--text4);padding:0 8px 11px;border-bottom:1px solid var(--border)}
+  thead th.r{text-align:right}
+  tbody td{padding:13px 8px;border-bottom:1px solid var(--border2)}
+  tbody tr.clickable{cursor:pointer}
+  tbody tr.clickable:hover{background:rgba(255,255,255,.025)}
+  .id{font-weight:600;letter-spacing:.01em}
+  .full{color:var(--accent2);margin-left:6px;font-size:9.5px;font-weight:700}
+  .amt-c{text-align:right;font-weight:650;letter-spacing:-.01em}
+  .conf-c{text-align:right;color:var(--text2)}
+  .sev{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:600;justify-content:flex-end}
+  .sev.crit{color:var(--crit)} .sev.high{color:var(--high)} .sev.med{color:var(--med)}
+  .sev .d{width:7px;height:7px;border-radius:50%;background:currentColor;box-shadow:0 0 7px currentColor}
+  .sla{text-align:right;color:var(--text3);font-size:11.5px}
+  .chev{text-align:right}
+
+  .footnote{font-size:10.5px;color:var(--text4);line-height:1.6;padding:0 2px 22px;max-width:900px}
+
+  .statusbar{height:34px;border-top:1px solid var(--border);display:flex;align-items:center;gap:8px;padding:0 28px;font-size:11px;color:var(--text3);background:var(--inset)}
+  .statusbar .live{color:var(--ok)}
+  .statusbar .spacer{flex:1}
+  .statusbar .syn{color:var(--med);letter-spacing:.05em}
+
+  .back{display:inline-flex;align-items:center;gap:7px;background:var(--surface);border:1px solid var(--border);color:var(--text2);cursor:pointer;font-size:12px;font-weight:550;padding:6px 12px 6px 9px;border-radius:8px}
+
+  /* case view */
+  .caseHead{display:flex;align-items:center;gap:12px;margin-top:14px;flex-wrap:wrap}
+  .caseHead .cid{font-size:24px;font-weight:650;letter-spacing:-.025em}
+  .vchip{padding:3px 9px;border-radius:5px;font-size:10px;font-weight:700;letter-spacing:.06em}
+  .money-banner{margin-top:16px;border-radius:14px;padding:18px 20px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+  .money-banner .big{font-size:40px;font-weight:700;letter-spacing:-.03em;line-height:1}
+  .grid2{display:grid;grid-template-columns:1.15fr 1fr;gap:16px;margin:18px 0 28px;align-items:start}
+  .ipanel{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px}
+  .step{display:flex;gap:12px;padding:11px 12px;border-radius:9px;border:1px solid var(--border);background:var(--inset);opacity:.4;transition:opacity .3s,background .3s,border-color .3s}
+  .step.done{opacity:1}
+  .step .num{flex-shrink:0;width:22px;height:22px;border-radius:50%;display:grid;place-items:center;background:rgba(255,255,255,.04);border:1px solid var(--border);font-size:11px;font-weight:700}
+  .step .lbl{font-size:12px;font-weight:600;color:var(--text)}
+  .step .src{font-size:9px;color:var(--text4)}
+  .step .detail{font-size:11px;line-height:1.45;margin-top:4px;color:var(--text2);display:none}
+  .step.done .detail{display:block}
+  .rf{padding:9px 11px;border-radius:8px;margin-bottom:7px}
+  .rf .lbl{font-size:11.5px;font-weight:600;line-height:1.3}
+  .rf .det{font-size:10.5px;color:var(--text2);line-height:1.45;padding-left:19px;margin-top:3px}
+  .evi{display:flex;gap:9px;padding:8px 10px;border-radius:7px;border:1px solid var(--border);background:var(--inset);margin-bottom:6px}
+  .evi .kind{padding:1px 6px;border-radius:3px;background:var(--accent-soft);color:var(--accent2);font-size:8.5px;font-weight:700;text-transform:uppercase;height:fit-content;flex-shrink:0}
+  .ringwrap{margin-top:14px;border-radius:12px;border:1px solid var(--border);background:var(--inset);padding:14px;position:relative;overflow:hidden}
+  .ringwrap .rtitle{font-size:10.5px;font-weight:650;letter-spacing:.09em;color:var(--text3);text-transform:uppercase;margin-bottom:6px}
+  .ringcallout{position:absolute;right:14px;bottom:14px;background:rgba(248,113,113,.12);border:1px solid rgba(248,113,113,.4);border-radius:9px;padding:8px 12px;font-size:11px;color:#fff;opacity:0;transition:opacity .5s}
+  .ringcallout.on{opacity:1}
+  .ringcallout b{color:var(--crit)}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .spin{display:inline-block;width:10px;height:10px;border:1.5px solid var(--border);border-top-color:var(--accent2);border-radius:50%;animation:spin .7s linear infinite}
+
+  /* agent engine */
+  .agentchips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+  .achip{display:flex;align-items:center;gap:6px;padding:5px 9px;border-radius:7px;border:1px solid var(--border);background:var(--inset);font-size:11px;color:var(--text3);transition:.3s}
+  .achip.run{border-color:rgba(99,102,241,.5);color:#c7cbff;background:var(--accent-soft)}
+  .achip.done{border-color:rgba(52,211,153,.35);color:var(--text2)}
+  .achip .adot{width:7px;height:7px;border-radius:50%;background:var(--text4);transition:.3s}
+  .achip.run .adot{background:var(--accent2);box-shadow:0 0 7px var(--accent2)}
+  .achip.done .adot{background:var(--ok);box-shadow:none}
+  .counters{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px}
+  .counter{background:var(--inset);border:1px solid var(--border);border-radius:8px;padding:8px 10px}
+  .counter .cl{font-size:9px;color:var(--text4);text-transform:uppercase;letter-spacing:.08em}
+  .counter .cv{font-size:15px;font-weight:650;margin-top:3px;letter-spacing:-.02em;color:var(--text)}
+  .termlog{background:#070A12;border:1px solid var(--border);border-radius:8px;padding:10px 12px;height:172px;overflow-y:auto;font-family:"SF Mono",ui-monospace,monospace;font-size:10.5px;line-height:1.65}
+  .termline{display:flex;gap:8px;opacity:0;animation:fadein .25s forwards}
+  .termline .ts{color:var(--text4);flex-shrink:0}
+  .termline .ag{color:var(--accent2);flex-shrink:0;width:70px}
+  .termline .tx{color:var(--text2)}
+  .termline.alert .tx{color:var(--crit)} .termline.warn .tx{color:var(--med)} .termline.ok .tx{color:var(--ok)}
+  @keyframes fadein{to{opacity:1}}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="side">
+    <div class="brand">
+      <div><b>Agents as a Service</b><span>Claims recovery intelligence</span></div>
+    </div>
+    <button class="nav active" data-nav="overview"><span class="i">◳</span> Overview</button>
+    <button class="nav" data-nav="staged-collision"><span class="i">⚑</span> Worklist</button>
+    <button class="nav" data-nav="repair-ring"><span class="i">⊞</span> Fraud rings</button>
+    <button class="nav" data-nav="duplicates"><span class="i">⧉</span> Duplicates</button>
+    <button class="nav" data-nav="padded-bi"><span class="i">⚖</span> Overpayments</button>
+    <div class="divider"></div>
+    <div class="nav" style="cursor:default"><span class="i">◴</span> Recovered</div>
+    <div class="me">
+      <div class="av">SM</div>
+      <div><b>S. Mokoena</b><span>SIU Lead</span></div>
+    </div>
+  </aside>
+
+  <div class="main">
+    <div class="topbar">
+      <button class="t" id="crumb" onclick="go({level:'overview'})">Portfolio Overview</button>
+      <div class="search">⌕ Search claims, accounts, repairers<span class="kbd">⌘K</span></div>
+      <div class="pill"><span class="dot"></span> SYNTHETIC</div>
+    </div>
+    <div class="content" id="content"></div>
+    <div class="statusbar">
+      <span class="live">● LIVE</span> Engine v0.9
+      <span>· Last scan 3 Jun 2026, 14:22</span>
+      <span>· 412,000 indexed</span>
+      <span class="spacer"></span>
+      <span class="syn">SYNTHETIC DATASET</span>
+    </div>
+  </div>
+</div>
+
+<script>
+// ════════════════════ DATA ════════════════════
+const COMPANY = {
+  insurer:"OUTsurance SA", period:"FY2025 · year ended 30 Jun 2025",
+  bookScanned:5.9e9, claimsScanned:412000, autoCleared:387400,
+  escalated:1220, investigating:183, referredSIU:64,
+  flaggedValue:142e6, recoverable:76e6, recoverableLow:58e6, recoverableHigh:86e6,
+  detectionConfidence:68, validationConfidence:82,
+  // exposure at each triage stage
+  exposureAssessed:5.9e9, exposureAutoCleared:5758e6, exposureEscalated:142e6,
+  exposureInvestigating:97e6, exposureReferredSIU:39e6
+};
+
+const CASES = {
+"CLM-44821":{id:"CLM-44821",claimant:"Sipho Khumalo",claimType:"Motor — total write-off",value:428000,notPayable:428000,policyNo:"OUT-MOT-7741209",dateOfLoss:"2026-04-22",province:"Gauteng",score:8.9,verdict:"FRAUDULENT",
+ topFlag:"The tow company and the panel-beater on this R428k claim are secretly owned by one person — who is behind 11 claims worth R2.14m",
+ summary:"On its own, this R428k BMW write-off looks like an ordinary single-vehicle crash. But our Network agent scanned the CIPC company registry and found that the tow operator and the panel-beater who 'independently' handled the claim are registered to the same director. That one hidden owner sits behind 11 separate 'unrelated' claims totalling R2.14m — a staged-collision ring you can only see once the claims are connected.",
+ ring:{label:"Tow + panel-beater network",hub:"1 hidden owner · CIPC",nodes:6,callout:"STAGED-COLLISION RING — R2.14M across 11 claims · 1 director · 91%"},
+ steps:[["Claim intake & policy match","Looks normal — but cover was raised R310k→R450k just 17 days before the crash.","Policy admin","warn"],["Claimant claims history","The same claimant's third total-loss motor claim in 28 months.","SAIA register","alert"],["Document & image forensics","Damage photos don't match a single-vehicle crash.","Photo EXIF","alert"],["Network linkage — CIPC scan","Tow operator + panel-beater share ONE CIPC director — the same person recurs across 11 claims.","CIPC registry","alert"],["Adjuster cross-check","That same tow + panel-beater pairing shows up in earlier staged claims.","Assessor","alert"],["Fraud scoring & verdict","One hidden owner behind 11 claims — 8.9/10 FRAUDULENT.","Fraud engine","alert"]],
+ redFlags:[["One hidden owner — found via CIPC","The tow company and the panel-beater are registered to the same director.","high"],["That owner = 11 claims, R2.14m","The same director sits behind 11 'unrelated' claims.","high"],["Cover bumped right before the loss","Agreed value raised R310k→R450k, 17 days before the crash.","high"],["Repeat total-loss claimant","Third write-off in 28 months.","medium"]],
+ greenFlags:["Premiums fully paid at date of loss","Valid, unendorsed driving licence"],
+ evidence:[["network","CIPC company registry","Tow operator + panel-beater both registered to director S. Dlamini."],["network","Ring linkage graph","The same director links 11 claims across 6 claimants — R2.14m total."],["document","Policy endorsement","Agreed value raised R310k→R450k, 17 days before the loss."]],
+ actions:["Repudiate the full R428k — staged loss","Freeze the other 10 linked claims under the same owner","Refer the tow + panel-beater network and its director to SIU & SAPS"]},
+
+"CLM-44844":{id:"CLM-44844",claimant:"Thabani Sithole",claimType:"Motor — hijacking (total loss)",value:742000,notPayable:742000,policyNo:"OUT-MOT-7741992",dateOfLoss:"2026-03-18",province:"Gauteng",score:9.1,verdict:"FRAUDULENT",
+ topFlag:"'Hijacked' GLE pinged crossing Beitbridge into Zimbabwe 31h after the reported hijack — SAPS docket then withdrawn",
+ summary:"A R742k Mercedes GLE reported hijacked in Midrand, but ANPR shows it voluntarily crossing into Zimbabwe 31 hours later. The insured is fronting for the financed owner (3 instalments in arrears) and the SAPS docket was withdrawn — an owner-arranged give-up. Full value exposed.",
+ ring:{label:"Cross-border give-up ring",hub:"Khanyisa Logistics CC",nodes:5,callout:"GIVE-UP RING — R1.4M across 4 claims · 1 exporter · 90%"},
+ steps:[["Claim intake & policy match","Finance & tracker in brother-in-law's name — classic fronting.","Wesbank","warn"],["Claimant claims history","Two prior theft/hijack claims in 4 years (one repudiated).","SAIA register","alert"],["Document & image forensics","'Last seen' photo EXIF predates the loss by 2 days; effects removed.","Photo EXIF","alert"],["Network linkage","True owner directs a CC sharing an address with a cross-border exporter.","CIPC / SIU","alert"],["Adjuster cross-check","Telematics shows calm drive north; ANPR confirms Beitbridge crossing.","Cartrack / ANPR","alert"],["Fraud scoring & verdict","Fronting + withdrawn docket + border crossing — 9.1/10 FRAUDULENT.","Fraud engine","alert"]],
+ redFlags:[["Vehicle crossed border post-loss","ANPR: into Zimbabwe 31h after the reported hijack.","high"],["SAPS case opened then withdrawn","Docket withdrawn after 6 days, no recovery effort.","high"],["Fronting — insured ≠ true owner","Finance in brother-in-law's name; no insurable interest.","high"],["Finance arrears motive","Owner 3 instalments in arrears at date of loss.","medium"]],
+ greenFlags:["Premiums current; cover active at date of loss"],
+ evidence:[["telematics","Cartrack + Beitbridge ANPR","Calm drive north then border crossing at 04:12 — contradicts the hijack report."],["document","SAPS CAS 35/03/2026","Opened then withdrawn in 6 days; non-cooperation noted."],["network","CIPC + SIU graph","True owner directs Khanyisa Logistics CC, linked to a cross-border exporter."]],
+ actions:["Repudiate R742k — fraud, fronting, no insurable interest","SAIA entry against insured + true owner","Refer to SAPS Vehicle Crime Unit + Hawks with ANPR"]},
+
+"CLM-44680":{id:"CLM-44680",claimant:"Ashwin Naicker",claimType:"Motor — accident repair",value:128450,notPayable:41200,policyNo:"OM-MOT-7741920",dateOfLoss:"2026-03-18",province:"Gauteng",score:6.8,verdict:"LEAKAGE",
+ topFlag:"Panel-beater padded invoice 47% above DEKRA estimate — same repairer + assessor recur across a 31-claim cluster",
+ summary:"Honest policyholder, genuine collision — but Apex Auto Body billed R128,450 vs an independent DEKRA estimate of R87,250. R41,200 of phantom parts and betterment. The repairer-assessor pair recurs across 31 claims with 38–52% over-billing — a systematic ring.",
+ ring:{label:"Apex Auto Body cluster",hub:"Assessor D. Naidoo",nodes:8,callout:"REPAIR RING — R4.53M across 31 claims · 1 repairer + 1 assessor · 94%"},
+ steps:[["Claim intake & policy match","Policy & vehicle match; SAPS case opened same day — claimant clean.","Stratos / SAPS","ok"],["Claimant claims history","One prior glass claim in 5 years; no link to the repairer.","SAIA INSDEX","ok"],["Document & image forensics","Airbag module + full bumper billed but absent from scene photos.","Invoice OCR / DEKRA","alert"],["Network linkage","Apex on 31 claims/12mo, 28 via the same assessor, 38–52% mark-up.","Repairer graph","alert"],["Adjuster cross-check","Assessor waived parts-receipt + salvage checks on 26 of 28.","Assessor audit","alert"],["Fraud scoring & verdict","Honest claimant, colluding repairer-assessor — pay verified, withhold padding.","Fraud engine","alert"]],
+ redFlags:[["Invoice 47% over independent estimate","R128,450 vs DEKRA R87,250 — R41,200 unsupported.","high"],["Phantom parts","Airbag + bumper billed but not on scene photos.","high"],["Recurring repairer-assessor pair","28 co-occurring claims, all over-billed 38–52%.","high"],["Control checks waived","Parts-receipt + salvage checks skipped on 26 of 28.","medium"]],
+ greenFlags:["Genuine policyholder; SAPS case day of loss","Clean 5-year history, no INSDEX hits","Independent DEKRA confirms R87,250 payable"],
+ evidence:[["invoice","Apex invoice #AAB-3391","R128,450; R41,200 phantom parts + betterment, no receipts."],["document","DEKRA estimate","Verified repair cost R87,250 — R41,200 below the invoice."],["network","Repairer-assessor cluster","Apex + Naidoo across 31 claims, 38–52% over-billing signature."]],
+ actions:["Settle R87,250; withhold R41,200 pending parts receipts","Refer Apex + assessor Naidoo to SIU for the 31-claim cluster","Suspend Apex from the preferred-supplier panel"]},
+
+"CLM-44712":{id:"CLM-44712",claimant:"Naledi Dlamini",claimType:"Motor — theft (total loss)",value:228500,notPayable:228500,policyNo:"OUTM-3387120",dateOfLoss:"2026-04-19",province:"Gauteng",score:8.9,verdict:"FRAUDULENT",
+ topFlag:"Policy not on our book — schedule forged by intermediary who diverted 11 months of premiums; R228,500 not payable, no contract exists",
+ summary:"A genuine victim paid R1,450/mo for 11 months believing she had cover. The policy doesn't exist on our system — the schedule was forged by an intermediary who diverted premiums to a personal account. No contract → R228,500 not payable, but the broker is linked to 9 other forged schedules.",
+ ring:{label:"Velani Risk Solutions",hub:"FNB acct ending 4471",nodes:9,callout:"GHOST-BROKER RING — R211K across 9 forged schedules · 1 account · 87%"},
+ steps:[["Claim intake & policy match","Policy number returns no record; no premium ever receipted.","Premium ledger","alert"],["Claimant claims history","Clean record; consistent debit orders — a genuine victim.","SAIA register","ok"],["Document & image forensics","Schedule built in Canva; quotes a deregistered FSP; logo hex wrong.","PDF EXIF / FSCA","alert"],["Network linkage","Intermediary linked to 9 forged schedules, all to one FNB account.","Broker graph","alert"],["Adjuster cross-check","Theft itself genuine (SAPS CAS) but binder never issued to this broker.","Adjuster / SAPS","warn"],["Fraud scoring & verdict","No valid contract — R228,500 not payable; refer broker to FSCA + SAPS.","Fraud engine / SIU","alert"]],
+ redFlags:[["Non-existent policy number","No record on admin; no premium receipted by the insurer.","high"],["Forged schedule","Assembled in Canva; deregistered FSP; mismatched logo.","high"],["Premium diversion","R1,450/mo routed to a personal FNB account.","high"],["Broker linked to a ring","Same intermediary tied to 9 forged schedules.","high"]],
+ greenFlags:["Clean prior claims history","Underlying theft genuine (SAPS CAS + tracker)","11 months of consistent debit-order proof"],
+ evidence:[["document","Forged schedule (PDF)","Canva author; deregistered FSP; logo hex mismatch — forgery."],["history","Premium ledger lookup","No record of the policy; zero premium ever receipted."],["network","Broker-fraud graph","9 forged schedules, all premiums to FNB account ending 4471."]],
+ actions:["Decline R228,500 — no valid contract exists","Report intermediary to the FSCA for premium misappropriation","Treat claimant as a victim; refer to OSTI for recourse"]},
+
+"CLM-44755":{id:"CLM-44755",claimant:"Thandeka Mokoena",claimType:"Contents — burglary/theft",value:212480,notPayable:94750,policyNo:"OHC-7741920-3",dateOfLoss:"2026-03-14",province:"Gauteng",score:6.8,verdict:"LEAKAGE",
+ topFlag:"Genuine break-in, padded inventory: a R3,499 till slip cloned to R34,999 plus 2 'stolen' appliances filmed in use on Instagram after the loss",
+ summary:"A verified burglary (SAPS case, forced entry) but the R212,480 schedule is padded by R94,750. A R3,499 till slip was cloned to R34,999, three items have no proof of purchase, and a TV + Dyson listed stolen appear in use in the claimant's post-loss Instagram. Settle R117,730, decline R94,750.",
+ steps:[["Claim intake & policy match","Burglary corroborated by SAPS case + armed-response log.","Policy / SAPS","ok"],["Claimant claims history","One prior clean claim; no cross-insurer hits.","ASISA register","ok"],["Document & image forensics","Till slip cloned R3,499→R34,999; two PDFs share metadata.","Invoice OCR","alert"],["Network linkage","No ring linkage — opportunistic padding by the individual.","Graph cache","ok"],["Adjuster cross-check","TV + Dyson (stolen) appear in use in later Instagram posts.","OSINT social","alert"],["Fraud scoring & verdict","Genuine event + R94,750 inflation — verdict LEAKAGE.","Fraud engine","warn"]],
+ redFlags:[["Stolen items appear in later posts","TV + Dyson (R28,500) visible in posts after the loss.","high"],["Cloned, re-totalled receipt","R3,499 slip altered to R34,999; shared PDF metadata.","high"],["No-proof high-value items","R34,750 of items with no receipt or bank record.","medium"],["Inventory ~1.8x last renewal","Schedule far above last declared sum insured.","medium"]],
+ greenFlags:["Burglary genuine — forced entry + SAPS case","Long-standing policyholder, one prior clean claim","No fraud-ring linkage"],
+ evidence:[["photo","Point-of-entry photos","Jemmied bars + broken lock corroborate a real forced entry."],["invoice","Receipt bundle (9 PDFs)","One till slip cloned + re-totalled; shared creation timestamps."],["document","Instagram OSINT","Two 'stolen' items in use in posts dated after the loss."]],
+ actions:["Settle R117,730; decline the R94,750 inflated portion","Request original invoices + statements for no-proof items","Log R94,750 as confirmed leakage avoided"]},
+
+"CLM-44903":{id:"CLM-44903",claimant:"Johan van der Merwe",claimType:"Buildings — geyser & water damage",value:87400,notPayable:61900,policyNo:"OUT-HB-7741920",dateOfLoss:"2026-03-14",province:"Gauteng",score:7.2,verdict:"LEAKAGE",
+ topFlag:"Brown-stained, sagging ceilings predate cover — only the R25.5k burst geyser is a valid sudden event; R61,900 is pre-existing damage",
+ summary:"An R87,400 buildings claim 38 days into a new policy. The burst geyser is genuine (~R25,500) but the ceiling/water damage is long-term, maintenance-related deterioration excluded as gradual damage. Settle the sudden-event portion, decline R61,900.",
+ steps:[["Claim intake & policy match","Loss reported 38 days into cover; 12-year-old geyser.","Underwriting","warn"],["Claimant claims history","Withdrawn 2023 water-ingress enquiry — pre-existing dampness known.","SAIA database","warn"],["Document & image forensics","Mature tannin rings + mould — months-to-years old, not 2 days.","Photo EXIF","alert"],["Network linkage","Plumber + ceiling contractor share a director + phone; 4 inflated quotes.","CIPC graph","alert"],["Adjuster cross-check","Geyser valid (~R25,500); ~70% of ceiling scope is aged deterioration.","Loss adjuster","alert"],["Fraud scoring & verdict","Genuine geyser + R61,900 pre-existing damage — verdict LEAKAGE.","Fraud engine","alert"]],
+ redFlags:[["Damage age ≠ loss date","Staining + mould indicate slow, long-term ingress.","high"],["Loss 38 days after inception","On a 12-year-old geyser with prior dampness on record.","high"],["Linked plumber & contractor","Shared director + phone; pattern of inflated quotes.","high"],["Scope padding","Quote covers rooms outside the geyser flow path.","medium"]],
+ greenFlags:["Burst geyser is a genuine sudden event","Cooperative claimant, prompt site access","No staged-loss or criminal flags"],
+ evidence:[["photo","Ceiling images","Mature tannin + mould + sag — classic gradual water damage."],["document","Moisture-meter readings","Historic dried staining + one fresh wet zone — two ages."],["network","Vendor director graph","Plumber + contractor share a director; 4 inflated quotes."]],
+ actions:["Settle ~R25,500 geyser + fresh damage; decline R61,900","Issue partial-decline citing the gradual-deterioration exclusion","Flag the vendors for panel review"]},
+
+"CLM-44790":{id:"CLM-44790",claimant:"Bellfast Joinery & Shopfitting (Pty) Ltd",claimType:"Business — fire + interruption",value:1480000,notPayable:420000,policyNo:"OBP-2271883-04",dateOfLoss:"2026-03-18",province:"Western Cape",score:5.4,verdict:"REVIEW",
+ topFlag:"Fire genuine, but BI quantum looks padded ~R420k — run-rate ~40% over filed financials; needs forensic accounting",
+ summary:"A genuine electrical fire at a Bellville workshop — ~R620k material damage signs off. But the R860k business-interruption claim assumes R215k/mo revenue (~40% above filed VAT201/CIPC figures) and a 62% GP rate vs filed 46%. Likely R420k padded, but not yet conclusive — forensic accounting required.",
+ steps:[["Claim intake & policy match","Valid fire + 4-month BI extension; premiums paid, loss in cover.","Business schedule","ok"],["Claimant claims history","One prior clean glass claim; no BI/fire history.","SAIA register","ok"],["Document & image forensics","BI cites R215k/mo vs R152k/mo in VAT201/CIPC — ~40% gap.","CIPC / VAT201 / OCR","alert"],["Network linkage","No ring linkage; contractor + director records clean.","Graph / CIPC","ok"],["Adjuster cross-check","Fire genuine; BI quantum 'overstated pending GP reconciliation'.","Loss adjuster","warn"],["Fraud scoring & verdict","Real loss, unsubstantiated BI — settle damage, route BI to forensics.","Fraud engine","warn"]],
+ redFlags:[["BI run-rate over filed financials","R215k/mo claimed vs R152k/mo filed; no order book.","high"],["GP rate inflated","62% applied vs ~46% filed — pads loss-of-profit.","high"],["Indemnity period over-claimed","Full 4 months at peak despite partial trading in ~6 weeks.","medium"],["Missing management accounts","Requested accounts + order book not supplied.","medium"]],
+ greenFlags:["Fire cause confirmed accidental by SAPS + adjuster","Clean history, no network linkage","Policy valid, paid, correctly scoped"],
+ evidence:[["history","CIPC AFS + VAT201","Trailing turnover ~R152k/mo, ~40% below the BI assumption."],["document","BI worksheet OCR","62% GP rate vs ~46% filed; no order book attached."],["photo","Scene photos","Genuine fire + ~R620k damage; undamaged second bay."]],
+ actions:["Settle ~R620k material damage; ring-fence the R860k BI","Appoint a forensic accountant to rebuild GP from filed accounts","Demand interim management accounts + order book"]},
+
+"CLM-44698":{id:"CLM-44698",claimant:"Lerato Mthembu",claimType:"Motor — windscreen",value:6480,notPayable:0,policyNo:"OUT-MV-3318724-01",dateOfLoss:"2026-05-21",province:"Gauteng",score:1.3,verdict:"CLEAR",
+ topFlag:"No red flags — full R6,480 windscreen reconciles across invoice, EXIF and telematics; fast-track clear",
+ summary:"A genuine windscreen replacement that reconciles cleanly across invoice, photo EXIF and telematics, with a long claim-free history. Zero exposure — cleared automatically. Shown to prove the agent clears legitimate claims fast, not just flags everything.",
+ steps:[["Claim intake & policy match","Vehicle, cover and R0 glass excess all match.","Policy admin","ok"],["Claimant claims history","No claims in 5 years; claim-free bonus intact.","SAIA register","ok"],["Document & image forensics","PG Glass invoice OCR-matches R6,480; EXIF clean.","Invoice OCR","ok"],["Network linkage","Approved-panel supplier; no anomalous linkage.","Supplier register","ok"],["Adjuster cross-check","Telematics confirms vehicle on the N1 at the stated time.","Telematics","ok"],["Fraud scoring & verdict","Everything reconciles — 1.3/10, clear and settle.","Fraud engine","ok"]],
+ redFlags:[],
+ greenFlags:["5-year claim-free history","Invoice, EXIF + telematics all reconcile","Approved supplier, market-rate pricing"],
+ evidence:[["invoice","PG Glass invoice","R6,480 OCR-matches the claim exactly; market rate."],["telematics","Trip log","Vehicle on the N1 at the stated time — matches the narrative."]],
+ actions:["Auto-settle R6,480 in full — no holdback","Pay the approved supplier and close","Log as a CLEAR control outcome"]}
+};
+
+const CATEGORIES = [
+ {id:"staged-collision",name:"Staged collisions",glyph:"⊞",blurb:"Induced or pre-arranged motor crashes, often timed to a cover increase.",product:"Motor",claimCount:142,exposure:38e6,recoverable:22e6,conf:89,caseIds:["CLM-44821"],
+  extra:[["CLM-44820","Single-vehicle write-off · Polokwane",318000,86,"high","3d"],["FR-004","Staged-collision ring · 11 claims",2140000,91,"crit","2d"]]},
+ {id:"staged-hijacking",name:"Staged hijacking / give-up",glyph:"⊘",blurb:"Owner-arranged disposals reported as hijackings; vehicles often exported.",product:"Motor",claimCount:64,exposure:31e6,recoverable:19e6,conf:91,caseIds:["CLM-44844"],
+  extra:[["CLM-44851","Luxury SUV 'hijack' · border ANPR hit",980000,92,"crit","1d"]]},
+ {id:"repair-ring",name:"Repair-shop kickback rings",glyph:"⊚",blurb:"Panel-beaters and assessors colluding to inflate invoices across many claims.",product:"Motor",claimCount:96,exposure:28e6,recoverable:16e6,conf:90,caseIds:["CLM-44680"],
+  extra:[["FR-001","Apex Auto Body cluster · 31 claims",4530000,94,"crit","2d"],["OVP-11","Phantom-parts over-billing · 9 claims",310000,78,"med","6d"]]},
+ {id:"inflated-contents",name:"Inflated contents",glyph:"⊟",blurb:"Genuine burglaries padded with items never owned or never lost.",product:"Home",claimCount:380,exposure:18e6,recoverable:9e6,conf:74,caseIds:["CLM-44755"],
+  extra:[["CLM-44760","Contents theft · duplicated receipts",64000,72,"med","7d"]]},
+ {id:"ghost-broker",name:"Ghost broker / premium diversion",glyph:"⊠",blurb:"Intermediaries forging schedules and pocketing premiums; risk never placed.",product:"Motor",claimCount:47,exposure:12e6,recoverable:7e6,conf:94,caseIds:["CLM-44712"],
+  extra:[["FR-002","Velani Risk Solutions · 9 forged schedules",211000,87,"high","5d"]]},
+ {id:"pre-existing",name:"Pre-existing / gradual damage",glyph:"≈",blurb:"Maintenance-related deterioration claimed as a sudden insured event.",product:"Home",claimCount:461,exposure:9.4e6,recoverable:4.2e6,conf:71,caseIds:["CLM-44903"],
+  extra:[["CLM-44910","Damp/ceiling claim · 41 days into cover",58000,70,"med","8d"]]},
+ {id:"padded-bi",name:"Padded business interruption",glyph:"▤",blurb:"Genuine fire/loss with BI quantum inflated above filed financials.",product:"Business",claimCount:22,exposure:4.2e6,recoverable:1.9e6,conf:64,caseIds:["CLM-44790"],
+  extra:[["CLM-44781","Retail BI · GP rate overstated",360000,66,"med","9d"]]},
+ {id:"duplicates",name:"Duplicate claims",glyph:"⧉",blurb:"Same loss claimed twice — across products, channels or insurers.",product:"Mixed",claimCount:14,exposure:0.9e6,recoverable:0.89e6,conf:99,caseIds:[],
+  extra:[["DUP-03","Double-paid motor claim · 2 channels",98500,99,"crit","1d"],["DUP-07","Cross-insurer duplicate · contents",142000,97,"crit","2d"]]}
+];
+
+// ════════════════════ HELPERS ════════════════════
+function fr(n){ if(n>=1e9)return"R"+(n/1e9).toFixed(1)+"bn"; if(n>=1e6)return"R"+(n/1e6).toFixed(n>=1e7?0:1)+"m"; if(n>=1e3)return"R"+Math.round(n/1e3)+"k"; return"R"+n; }
+function num(n){ return n.toLocaleString(); }
+const VC={FRAUDULENT:"var(--crit)",LEAKAGE:"var(--high)",REVIEW:"var(--med)",CLEAR:"var(--ok)"};
+const SC={crit:"var(--crit)",high:"var(--high)",med:"var(--med)"};
+function sevName(s){return s==="crit"?"Critical":s==="high"?"High":"Medium";}
+function catById(id){return CATEGORIES.find(c=>c.id===id);}
+function caseRow(c){const sev=c.verdict==="FRAUDULENT"?"crit":c.verdict==="LEAKAGE"?"high":"med";return{ref:c.id,label:c.claimType+" · "+c.claimant,exposure:c.notPayable||c.value,conf:Math.min(99,Math.round(c.score*10)),sev,sla:c.verdict==="FRAUDULENT"?"2d":"5d",caseId:c.id};}
+function catRows(cat){const detailed=cat.caseIds.map(id=>caseRow(CASES[id]));const extra=cat.extra.map(e=>({ref:e[0],label:e[1],exposure:e[2],conf:e[3],sev:e[4],sla:e[5],caseId:null}));return detailed.concat(extra).sort((a,b)=>b.exposure-a.exposure);}
+
+// ════════════════════ ROUTER ════════════════════
+let view={level:"overview"};
+function go(v){view=v;render();window.scrollTo(0,0);}
+function render(){
+  document.querySelectorAll(".nav").forEach(n=>{const id=n.getAttribute("data-nav");n.classList.toggle("active",(view.level==="overview"&&id==="overview")||(view.level==="category"&&id===view.id));});
+  const crumb=document.getElementById("crumb");
+  crumb.textContent=view.level==="overview"?"Portfolio Overview":view.level==="category"?("Categories · "+catById(view.id).name):("Case · "+view.id);
+  const c=document.getElementById("content");
+  if(view.level==="overview")c.innerHTML=overviewHTML();
+  else if(view.level==="category")c.innerHTML=categoryHTML(view.id);
+  else c.innerHTML=caseHTML(view.id);
+  if(view.level==="case")animateCase(view.id);
+}
+
+// ════════════════════ LEVEL 1 ════════════════════
+function overviewHTML(){
+  const pct=((COMPANY.flaggedValue/COMPANY.bookScanned)*100).toFixed(1);
+  const top=CATEGORIES.flatMap(cat=>catRows(cat).map(r=>Object.assign({},r,{cat:cat.id}))).sort((a,b)=>b.exposure-a.exposure).slice(0,7);
+  return `
+  <div class="h1">Portfolio Overview</div>
+  <div class="scanline">${COMPANY.insurer} · ${COMPANY.period} · ${num(COMPANY.claimsScanned)} closed claims indexed</div>
+  <div class="standfirst">We scanned <b>${fr(COMPANY.bookScanned)}</b> of ${COMPANY.insurer} claims paid across <b>${num(COMPANY.claimsScanned)}</b> claims. <b>${num(COMPANY.escalated)} claims</b> across eight fraud categories surfaced — <span class="money">${fr(COMPANY.flaggedValue)}</span> flagged for investigation, <span class="money">${fr(COMPANY.recoverable)}</span> estimated recoverable.</div>
+  <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:16px">
+    ${triageCard("Assessed",num(COMPANY.claimsScanned),fr(COMPANY.exposureAssessed),"var(--text2)","Total book scanned")}
+    ${triageCard("Auto-cleared",num(COMPANY.autoCleared),fr(COMPANY.exposureAutoCleared),"var(--ok)","Cleared of suspicion")}
+    ${triageCard("Escalated",num(COMPANY.escalated),fr(COMPANY.exposureEscalated),"var(--high)","Total Exposure Flagged")}
+    ${triageCard("Investigating",COMPANY.investigating,fr(COMPANY.exposureInvestigating),"var(--med)","Total Exposure Flagged")}
+    ${triageCard("Referred to SIU",COMPANY.referredSIU,fr(COMPANY.exposureReferredSIU),"var(--crit)","Total Exposure Flagged")}
+  </div>
+  <div class="kpis">
+    ${kpi("Total Exposure Flagged",fr(COMPANY.flaggedValue),"of "+fr(COMPANY.bookScanned)+" scanned · "+pct+"%",68,"Detection confidence",COMPANY.detectionConfidence,true,false)}
+    ${kpi("Est. Recoverable",fr(COMPANY.recoverableLow)+"–"+fr(COMPANY.recoverableHigh),"rule-validated subset",82,"Validation confidence",COMPANY.validationConfidence,false,true)}
+    ${kpi("Fraud Categories","8",num(COMPANY.escalated)+" flagged claims",91,"Avg category confidence",82,false,false)}
+    ${kpi("Highest Priority",String(CATEGORIES.filter(c=>c.conf>=88).length),"categories ≥ 88% conf · act in 7d",94,"Top-tier confidence",94,false,false)}
+  </div>
+  <div class="sectlabel">Fraud categories <span>click to zoom in →</span></div>
+  <div class="catgrid">
+    ${CATEGORIES.map(cat=>`<button class="catcard" onclick="go({level:'category',id:'${cat.id}'})">
+      <div style="display:flex;justify-content:space-between;align-items:center"><span class="glyph">${cat.glyph}</span><span class="mono" style="font-size:10.5px;color:${cat.conf>=85?'var(--ok)':'var(--med)'}">${cat.conf}%</span></div>
+      <div class="cname">${cat.name}</div>
+      <div class="cval tnum">${fr(cat.exposure)}</div>
+      <div class="csub tnum">${num(cat.claimCount)} claims · ${fr(cat.recoverable)} recoverable</div>
+    </button>`).join("")}
+  </div>
+  <div class="panel">
+    <div class="ptitle">Top recovery worklist <span class="sort">Sorted by exposure ▾</span></div>
+    ${worklistTable(top)}
+  </div>
+  <div class="footnote">Flagged = AI detection confidence ≥ 65%. Est. recoverable = rule-validated subset, pending investigator confirmation. Synthetic demonstration dataset · book size grounded in ${COMPANY.insurer} ${COMPANY.period} (R13.1bn net earned premium × 44.6% claims ratio ≈ ${fr(COMPANY.bookScanned)} claims paid). Production connects to OUTsurance claims data under signed NDA + POPIA DPA.</div>`;
+}
+function kpi(label,val,sub,barPct,cl,cv,accent,green){return `
+  <div class="card"><div class="klabel">${label}</div><div class="kval ${accent?'accent':''} tnum">${val}</div><div class="ksub">${sub}</div>
+  <div class="bar ${green?'green':''}"><i style="width:${barPct}%"></i></div>
+  <div class="conf"><span>${cl}</span><span class="tnum">${cv}%</span></div></div>`;}
+function triageCard(label,count,exposure,color,expLabel){return `
+  <div class="card" style="padding:15px 16px">
+    <div class="klabel">${label}</div>
+    <div class="kval tnum" style="font-size:28px;margin-top:8px;color:${color}">${count}</div>
+    <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
+      <div style="font-size:9.5px;font-weight:650;letter-spacing:.08em;color:var(--text4);text-transform:uppercase;margin-bottom:3px">${expLabel}</div>
+      <div class="tnum" style="font-size:14px;font-weight:650;color:${color==='var(--text2)'?'var(--text3)':color}">${exposure}</div>
+    </div>
+  </div>`;};
+
+// ════════════════════ LEVEL 2 ════════════════════
+function categoryHTML(id){
+  const cat=catById(id);const rows=catRows(cat);const pct=((cat.exposure/COMPANY.flaggedValue)*100).toFixed(0);
+  return `
+  <button class="back" onclick="go({level:'overview'})">← Back to overview</button>
+  <div style="display:flex;align-items:center;gap:12px;margin-top:14px"><span style="font-size:26px;color:var(--accent2)">${cat.glyph}</span><div class="h1">${cat.name}</div></div>
+  <div style="font-size:14px;color:var(--text2);margin-top:8px;max-width:760px;line-height:1.5">${cat.blurb}</div>
+  <div class="kpis" style="margin-top:20px">
+    ${miniKpi("Flagged exposure",fr(cat.exposure),pct+"% of book flagged value","#fff")}
+    ${miniKpi("Est. recoverable",fr(cat.recoverable),"rule-validated","var(--ok)")}
+    ${miniKpi("Flagged claims",num(cat.claimCount),cat.product+" line","var(--text)")}
+    ${miniKpi("Avg confidence",cat.conf+"%",cat.conf>=85?"high":"medium","var(--text)")}
+  </div>
+  <div class="panel">
+    <div class="ptitle">Cases in this category <span class="sort">click a ● FULL case for the report →</span></div>
+    ${worklistTable(rows)}
+  </div>`;
+}
+function miniKpi(label,val,sub,color){return `<div class="card" style="padding:15px 16px"><div class="klabel">${label}</div><div class="kval tnum" style="font-size:26px;margin-top:9px;color:${color}">${val}</div><div class="ksub">${sub}</div></div>`;}
+
+// ════════════════════ WORKLIST ════════════════════
+function worklistTable(rows){
+  return `<table><thead><tr><th>Case</th><th>Detail</th><th class="r">Exposure</th><th class="r">Conf.</th><th class="r">Severity</th><th class="r">SLA</th><th></th></tr></thead><tbody>
+  ${rows.map(r=>{const cl=r.caseId?`class="clickable" onclick="go({level:'case',id:'${r.caseId}',from:'${r.cat||(view.level==='category'?view.id:'')}'})"`:'';
+    return `<tr ${cl}>
+      <td class="id" style="color:${r.caseId?'var(--text)':'var(--text2)'}">${r.ref}${r.caseId?'<span class="full">● FULL</span>':''}</td>
+      <td style="color:var(--text2);max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.label}</td>
+      <td class="amt-c tnum">${fr(r.exposure)}</td>
+      <td class="conf-c tnum">${r.conf}%</td>
+      <td class="amt-c"><span class="sev ${r.sev}"><span class="d"></span>${sevName(r.sev)}</span></td>
+      <td class="sla tnum">${r.sla}</td>
+      <td class="chev" style="color:${r.caseId?'var(--accent2)':'var(--text4)'}">›</td>
+    </tr>`;}).join("")}
+  </tbody></table>`;
+}
+
+// ════════════════════ LEVEL 3 — CASE ════════════════════
+function caseHTML(id){
+  const c=CASES[id];const color=VC[c.verdict];const payable=c.value-c.notPayable;
+  const vline={FRAUDULENT:"Repudiate — claim not payable",LEAKAGE:"Part-settle — withhold inflated portion",REVIEW:"Hold for forensic review before settlement",CLEAR:"Approved — settle in full"}[c.verdict];
+  const back=view.from?`go({level:'category',id:'${view.from}'})`:`go({level:'overview'})`;
+  return `
+  <button class="back" onclick="${back}">← Back to category</button>
+  <div class="caseHead"><div class="cid">${c.id}</div><span style="font-size:14px;color:var(--text3)">· ${c.claimant} · ${c.claimType}</span>
+    <span class="vchip" style="background:${color}22;border:1px solid ${color}55;color:${color}">${c.verdict}</span>
+    <span class="mono" style="margin-left:auto;font-size:11.5px;color:var(--text3)">${c.policyNo} · loss ${c.dateOfLoss} · ${c.province}</span></div>
+  <div class="money-banner" style="background:linear-gradient(135deg,${color}26,${color}0d);border:1px solid ${color}40">
+    <div><div class="mono" style="color:${color};font-size:10px;letter-spacing:.12em;text-transform:uppercase;font-weight:700;margin-bottom:6px">${c.verdict==="CLEAR"?"Cleared":"Exposure caught"}</div>
+      <div style="font-size:16px;font-weight:600;color:#fff">${vline}</div>
+      <div style="font-size:12px;color:var(--text3);margin-top:4px">claimed ${fr(c.value)} · fraud score ${c.score.toFixed(1)}/10</div></div>
+    <div style="text-align:right"><div class="mono" style="font-size:10px;color:var(--text3);letter-spacing:.08em;text-transform:uppercase">${c.verdict==="CLEAR"?"Payable":"Not payable"}</div>
+      <div class="big tnum" style="color:${color}">${c.verdict==="CLEAR"?fr(c.value):fr(c.notPayable)}</div>
+      ${(c.notPayable>0&&c.notPayable<c.value)?`<div class="mono" style="font-size:11px;color:var(--text3);margin-top:4px">settle ${fr(payable)}</div>`:""}</div>
+  </div>
+  <div class="grid2">
+    <div class="ipanel">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><div style="font-size:13px;font-weight:600">Agent engine · live</div><span id="pipestat" class="mono" style="font-size:10.5px;color:var(--accent2)">initialising…</span></div>
+      <div class="agentchips">
+        <div class="achip" id="achip-intake"><span class="adot"></span>Intake &amp; Policy</div>
+        <div class="achip" id="achip-history"><span class="adot"></span>Claims History</div>
+        <div class="achip" id="achip-forensics"><span class="adot"></span>Doc Forensics</div>
+        <div class="achip" id="achip-network"><span class="adot"></span>Network Linkage</div>
+        <div class="achip" id="achip-scoring"><span class="adot"></span>Fraud Scoring</div>
+      </div>
+      <div class="counters">
+        <div class="counter"><div class="cl">Agents</div><div class="cv" id="ct-agents">0/5</div></div>
+        <div class="counter"><div class="cl">Sources</div><div class="cv tnum" id="ct-sources">0</div></div>
+        <div class="counter"><div class="cl">Tokens</div><div class="cv tnum" id="ct-tokens">0.0k</div></div>
+        <div class="counter"><div class="cl">Compute</div><div class="cv tnum" id="ct-compute">R0.00</div></div>
+      </div>
+      <div class="termlog" id="termlog"></div>
+      <div style="margin:16px 0 8px;font-size:11px;font-weight:600;color:var(--text2)">Stage conclusions</div>
+      <div id="steps" style="display:flex;flex-direction:column;gap:8px">
+        ${c.steps.map((s,i)=>{const sv=s[3];const sc=sv==="alert"?"var(--crit)":sv==="warn"?"var(--med)":"var(--ok)";
+          return `<div class="step" data-i="${i}" data-sev="${sv}" style="--sc:${sc}">
+            <div class="num">${i+1}</div>
+            <div style="flex:1;min-width:0"><div style="display:flex;justify-content:space-between;gap:8px"><span class="lbl">${s[0]}</span><span class="src mono">${s[2]}</span></div>
+            <div class="detail">${s[1]}</div></div></div>`;}).join("")}
+      </div>
+      ${c.ring?ringHTML(c):""}
+      <div id="evi" style="margin-top:16px;display:none">
+        <div class="klabel" style="margin-bottom:8px">Evidence · ${c.evidence.length}</div>
+        ${c.evidence.map(e=>`<div class="evi"><span class="kind">${e[0]}</span><div><div style="font-size:11px;font-weight:600">${e[1]}</div><div style="font-size:10.5px;color:var(--text2);line-height:1.4;margin-top:1px">${e[2]}</div></div></div>`).join("")}
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="ipanel" style="padding:16px 18px"><div class="klabel" style="margin-bottom:8px">Case summary</div><div style="font-size:12.5px;line-height:1.6;color:var(--text)">${c.summary}</div></div>
+      <div class="ipanel" style="padding:16px 18px"><div class="klabel" style="margin-bottom:10px;color:${c.redFlags.length?'var(--crit)':'var(--ok)'}">${c.redFlags.length?("Red flags · "+c.redFlags.length):"No red flags"}</div>
+        ${c.redFlags.map(f=>`<div class="rf" style="border:1px solid ${f[2]==="high"?"rgba(248,113,113,.28)":"rgba(251,191,36,.28)"};background:${f[2]==="high"?"var(--crit-bg)":"var(--med-bg)"}"><div style="display:flex;gap:7"><span style="color:${f[2]==="high"?"var(--crit)":"var(--med)"};font-size:12px">⚠</span><span class="lbl">${f[0]}</span></div><div class="det">${f[1]}</div></div>`).join("")}
+        ${c.greenFlags.map(g=>`<div style="display:flex;gap:8;padding:4px 2px"><span style="color:var(--ok);font-size:11px">✓</span><span style="font-size:11px;color:var(--text3);line-height:1.4">${g}</span></div>`).join("")}
+      </div>
+      <div style="border-radius:14px;border:1px solid ${color}40;background:${color}0e;padding:16px 18px"><div class="mono klabel" style="color:${color};margin-bottom:8px">Recommended actions</div>
+        ${c.actions.map(a=>`<div style="display:flex;gap:8;margin-bottom:6px"><span style="color:${color};font-size:12px;margin-top:1px;font-weight:700">→</span><span style="font-size:11.5px;line-height:1.45">${a}</span></div>`).join("")}
+      </div>
+    </div>
+  </div>`;
+}
+
+function ringHTML(c){
+  return `<div class="ringwrap" id="ringwrap">
+    <div class="rtitle">Network reveal · ${c.ring.label}</div>
+    <svg id="ringsvg" viewBox="0 0 460 200" style="width:100%;height:190px"></svg>
+    <div class="ringcallout" id="ringcallout"><b>⚠ ${c.ring.callout.split(' — ')[0]}</b> — ${c.ring.callout.split(' — ').slice(1).join(' — ')}</div>
+  </div>`;
+}
+
+// ════════════════════ CASE ANIMATION ════════════════════
+const ATOOLS={intake:["policy-admin.lookup","premium-ledger.check"],history:["saia.register","insdex.search"],forensics:["photo.exif","invoice.ocr"],network:["cipc.graph","bank.trace"],scoring:["fraud-model.score"]};
+function agentForStep(i){return ["intake","history","forensics","network","forensics","scoring"][i];}
+function aName(id){return ({orchestrator:"orchestr.",intake:"intake",history:"history",forensics:"forensics",network:"network",scoring:"scoring"})[id]||id;}
+function buildEvents(c){
+  const ev=[{ag:"orchestr.",type:"spawn",text:"spawning 5 agents · "+c.id,sev:""}];
+  [["intake","Intake & Policy"],["history","Claims History"],["forensics","Doc Forensics"],["network","Network Linkage"],["scoring","Fraud Scoring"]].forEach(a=>ev.push({ag:aName(a[0]),agent:a[0],type:"spawn",text:a[1]+" online",sev:""}));
+  c.steps.forEach((s,i)=>{const ag=agentForStep(i);const tl=ATOOLS[ag];
+    ev.push({ag:aName(ag),agent:ag,type:"tool",text:tl[i%tl.length]+" → "+s[2],sev:""});
+    ev.push({ag:aName(ag),agent:ag,type:"result",text:"indexed · "+s[2],sev:""});
+    ev.push({ag:aName(ag),agent:ag,type:"finding",stepIndex:i,text:s[1],sev:s[3]});
+  });
+  ev.push({ag:aName("scoring"),agent:"scoring",type:"done",text:"pipeline complete · fraud score "+c.score.toFixed(1)+"/10",sev:c.verdict==="CLEAR"?"ok":"alert"});
+  return ev;
+}
+function markStepDone(st){ if(!st||st.classList.contains("done"))return; st.classList.add("done"); const sv=st.getAttribute("data-sev"); const sc=getComputedStyle(st).getPropertyValue("--sc"); st.style.borderColor=sc+"33"; st.style.background=sc+"0e"; const num=st.querySelector(".num"); if(num){num.style.background=sc+"22";num.style.borderColor=sc+"55";num.style.color=sc;num.textContent=sv==="ok"?"✓":sv==="warn"?"!":"⚠";} }
+function animateCase(id){
+  const c=CASES[id]; const events=buildEvents(c);
+  const steps=document.querySelectorAll("#steps .step");
+  const log=document.getElementById("termlog"); const stat=document.getElementById("pipestat");
+  let sources=0,tokens=0,k=0;
+  const set=(cid,v)=>{const el=document.getElementById(cid);if(el)el.textContent=v;};
+  stat.textContent="running";
+  const tick=setInterval(()=>{
+    if(k>=events.length){clearInterval(tick);
+      steps.forEach(markStepDone);
+      document.querySelectorAll(".achip").forEach(ch=>{ch.classList.remove("run");ch.classList.add("done");});
+      set("ct-agents","5/5"); stat.textContent="complete"; stat.style.color="var(--ok)";
+      const evi=document.getElementById("evi"); if(evi)evi.style.display="block"; if(c.ring)drawRing(c);
+      return;
+    }
+    const e=events[k]; k++;
+    const line=document.createElement("div"); line.className="termline "+(e.sev||"");
+    line.innerHTML='<span class="ts">'+String(Math.floor(k*0.4)).padStart(2,"0")+'s</span><span class="ag">'+e.ag+'</span><span class="tx">▸ '+e.text+'</span>';
+    log.appendChild(line); log.scrollTop=log.scrollHeight;
+    if(e.type==="spawn"&&e.agent){const chip=document.getElementById("achip-"+e.agent);if(chip)chip.classList.add("run");}
+    if(e.type==="result"){sources++;set("ct-sources",sources);}
+    if(e.type!=="spawn"){tokens+=Math.round(380+e.text.length*7);set("ct-tokens",(tokens/1000).toFixed(1)+"k");set("ct-compute","R"+(tokens*0.00003).toFixed(2));}
+    if(e.type==="finding"){const chip=document.getElementById("achip-"+e.agent);if(chip){chip.classList.remove("run");chip.classList.add("done");} markStepDone(steps[e.stepIndex]); set("ct-agents",document.querySelectorAll(".achip.done").length+"/5");}
+  },175);
+}
+
+function drawRing(c){
+  const svg=document.getElementById("ringsvg");if(!svg)return;
+  const cx=230,cy=95,R=68,N=c.ring.nodes;const NS="http://www.w3.org/2000/svg";
+  // hub
+  const hub=document.createElementNS(NS,"polygon");
+  hub.setAttribute("points",`${cx},${cy-13} ${cx+13},${cy} ${cx},${cy+13} ${cx-13},${cy}`);
+  hub.setAttribute("fill","var(--crit)");hub.setAttribute("opacity","0");hub.style.transition="opacity .5s";svg.appendChild(hub);
+  const hl=document.createElementNS(NS,"text");hl.setAttribute("x",cx);hl.setAttribute("y",cy+28);hl.setAttribute("text-anchor","middle");hl.setAttribute("fill","var(--text3)");hl.setAttribute("font-size","9");hl.textContent=c.ring.hub;hl.setAttribute("opacity","0");hl.style.transition="opacity .5s";svg.appendChild(hl);
+  const nodes=[];
+  for(let i=0;i<N;i++){const a=(i/N)*Math.PI*2-Math.PI/2;const x=cx+Math.cos(a)*R*1.7,y=cy+Math.sin(a)*R;
+    const ln=document.createElementNS(NS,"line");ln.setAttribute("x1",cx);ln.setAttribute("y1",cy);ln.setAttribute("x2",x);ln.setAttribute("y2",y);ln.setAttribute("stroke","var(--crit)");ln.setAttribute("stroke-width","1");ln.setAttribute("opacity","0");ln.style.transition="opacity .4s";svg.appendChild(ln);
+    const cnode=document.createElementNS(NS,"circle");cnode.setAttribute("cx",x);cnode.setAttribute("cy",y);cnode.setAttribute("r","6");cnode.setAttribute("fill","var(--surface2)");cnode.setAttribute("stroke","var(--crit)");cnode.setAttribute("stroke-width","1.5");cnode.setAttribute("opacity","0");cnode.style.transition="opacity .4s, cx .6s ease, cy .6s ease";svg.appendChild(cnode);
+    nodes.push({ln,cnode,x,y,a});}
+  // reveal sequence
+  setTimeout(()=>{hub.setAttribute("opacity","1");hl.setAttribute("opacity","1");},200);
+  nodes.forEach((nd,i)=>setTimeout(()=>{nd.cnode.setAttribute("opacity","1");},400+i*120));
+  nodes.forEach((nd,i)=>setTimeout(()=>{nd.ln.setAttribute("opacity",".5");},400+N*120+i*90));
+  // collapse toward hub a touch (tighten the knot)
+  setTimeout(()=>{nodes.forEach(nd=>{const nx=cx+Math.cos(nd.a)*R*1.25,ny=cy+Math.sin(nd.a)*R*0.72;nd.cnode.setAttribute("cx",nx);nd.cnode.setAttribute("cy",ny);nd.ln.setAttribute("x2",nx);nd.ln.setAttribute("y2",ny);});},400+N*120+N*90+250);
+  setTimeout(()=>{const co=document.getElementById("ringcallout");if(co)co.classList.add("on");},400+N*120+N*90+700);
+}
+
+// nav buttons
+document.querySelectorAll(".nav[data-nav]").forEach(b=>b.addEventListener("click",()=>{const id=b.getAttribute("data-nav");go(id==="overview"?{level:"overview"}:{level:"category",id});}));
+
+render();
+</script>
+</body>
+</html>
