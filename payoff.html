@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>The Payoff — Agent Harness</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
+  :root{
+    --bg:#0A0E18; --surface:#10172499; --border:rgba(255,255,255,.06);
+    --text:#EAEDF4; --text-2:#98A1B3; --text-3:#5E6679;
+    --accent:#818cf8; --accent-deep:#6366F1;
+    --crit:#F87171; --ok:#34D399; --ok-2:#6EE7B7; --warn:#FBBF24;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Inter',system-ui,sans-serif;overflow:hidden}
+
+  .slide{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;align-items:center;padding:30px 72px}
+  /* layered ambient glow */
+  .slide::before{
+    content:'';position:absolute;inset:0;pointer-events:none;
+    background:
+      radial-gradient(1000px 560px at 50% -12%, rgba(99,102,241,.12), transparent 62%),
+      radial-gradient(700px 500px at 92% 108%, rgba(52,211,153,.07), transparent 60%);
+  }
+  /* fine grid texture */
+  .slide::after{
+    content:'';position:absolute;inset:0;pointer-events:none;opacity:.5;
+    background-image:linear-gradient(rgba(255,255,255,.015) 1px,transparent 1px),
+                     linear-gradient(90deg,rgba(255,255,255,.015) 1px,transparent 1px);
+    background-size:48px 48px;mask-image:radial-gradient(circle at 50% 40%,#000,transparent 78%);
+  }
+  .wrap{width:100%;max-width:1140px;position:relative;z-index:2}
+
+  /* ── header ── */
+  .head{display:flex;align-items:flex-end;justify-content:space-between;gap:32px;margin-bottom:22px}
+  .brand-pill{
+    display:inline-flex;align-items:center;gap:8px;
+    background:rgba(99,102,241,.14);border:1px solid rgba(99,102,241,.28);
+    border-radius:9999px;padding:5px 13px;
+    font-size:10.5px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);
+    margin-bottom:16px;
+  }
+  .brand-pill .dot-live{width:6px;height:6px;border-radius:50%;background:var(--accent-deep);animation:pulse 2s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+  .eyebrow{font-size:11px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);margin-bottom:12px}
+  h1{font-size:clamp(30px,3.6vw,46px);font-weight:800;line-height:1.06;letter-spacing:-.025em;color:#fff}
+  h1 .em{
+    background:linear-gradient(92deg,#6EE7B7,#34D399);
+    -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+  }
+  .head-aside{text-align:right;flex-shrink:0;padding-bottom:4px}
+  .aside-num{font-size:clamp(34px,4.4vw,56px);font-weight:800;letter-spacing:-.03em;color:#fff;font-variant-numeric:tabular-nums;line-height:1}
+  .aside-num .pre{color:var(--text-3);font-weight:600}
+  .aside-cap{font-size:11px;color:var(--text-3);letter-spacing:.06em;text-transform:uppercase;margin-top:8px;font-weight:600}
+
+  /* ── main split ── */
+  .grid{display:grid;grid-template-columns:1.18fr .92fr;gap:40px;align-items:center}
+  #chart{width:100%;height:330px}
+
+  /* ── value cards (right) ── */
+  .vstack{display:flex;flex-direction:column;gap:13px}
+  .vcard{
+    position:relative;overflow:hidden;
+    background:linear-gradient(180deg,rgba(255,255,255,.035),rgba(255,255,255,.012));
+    border:1px solid var(--border);border-radius:16px;padding:16px 18px;
+    display:flex;align-items:center;gap:16px;
+    box-shadow:inset 0 1px 1px rgba(255,255,255,.05);
+  }
+  .vcard::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--co)}
+  .co-logo{
+    width:48px;height:48px;border-radius:11px;flex-shrink:0;
+    display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;
+  }
+  .co-fnb{background:#00829B;color:#fff}
+  .co-mtn{background:#FFCB05;color:#0A0E18}
+  .co-out{background:#00B5A5;color:#fff}
+  .co-momo{background:#2D6CDF;color:#fff;font-size:11px}
+  .vmid{flex:1;min-width:0}
+  .vname{font-size:12.5px;font-weight:700;color:#fff;margin-bottom:2px}
+  .vdom{font-size:10.5px;color:var(--text-3);line-height:1.4}
+  .vval{text-align:right;flex-shrink:0}
+  .vflow{display:flex;align-items:baseline;gap:7px;justify-content:flex-end;font-variant-numeric:tabular-nums}
+  .v-before{font-size:21px;font-weight:800;color:var(--crit);letter-spacing:-.01em}
+  .v-arr{font-size:14px;color:var(--text-3)}
+  .v-after{font-size:21px;font-weight:800;color:var(--ok);letter-spacing:-.01em}
+  .vsub{font-size:10px;color:var(--text-3);margin-top:3px;letter-spacing:.04em;text-transform:uppercase;font-weight:600}
+
+  /* ── bottom value strip ── */
+  .strip{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:20px}
+  .scard{
+    background:var(--surface);border:1px solid var(--border);border-radius:14px;
+    padding:16px 22px;display:flex;align-items:center;gap:16px;
+    box-shadow:inset 0 1px 1px rgba(255,255,255,.04);
+  }
+  .scard.hl{border-color:rgba(52,211,153,.28);background:linear-gradient(180deg,rgba(52,211,153,.07),rgba(52,211,153,.02))}
+  .s-ico{font-size:20px;opacity:.9;flex-shrink:0}
+  .s-val{font-size:clamp(20px,2.4vw,28px);font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums;line-height:1}
+  .s-val.ok{color:var(--ok)} .s-val.white{color:#fff} .s-val.warn{color:var(--warn)}
+  .s-label{font-size:11px;color:var(--text-2);margin-top:5px;line-height:1.35;font-weight:500}
+
+  .footnote{font-size:10.5px;color:var(--text-3);margin-top:14px;text-align:center;letter-spacing:.02em}
+  .footnote .synth{color:var(--warn)}
+</style>
+</head>
+<body>
+
+<div class="slide">
+  <div class="wrap">
+
+    <div class="head">
+      <div>
+        <div class="brand-pill"><span class="dot-live"></span>Agents as a Service</div>
+        <div class="eyebrow">The payoff</div>
+        <h1>The same data — <span class="em">R2.8bn a year</span> back on the balance sheet.</h1>
+      </div>
+      <div class="head-aside">
+        <div class="aside-num" data-count="2.8" data-decimals="1" data-prefix="R" data-suffix="B"><span class="pre">R</span>0.0B</div>
+        <div class="aside-cap">recoverable / year &nbsp;·&nbsp; OUTsurance · FNB · MTN · MoMo</div>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div id="chart"></div>
+
+      <div class="vstack">
+        <div class="vcard" style="--co:#00B5A5">
+          <div class="co-logo co-out">OUT</div>
+          <div class="vmid">
+            <div class="vname">OUTsurance — Insurer</div>
+            <div class="vdom">Claims fraud &amp; leakage · staged loss, padded BI, repair rings · R5.9bn book</div>
+          </div>
+          <div class="vval">
+            <div class="vflow"><span class="v-before">R140M</span><span class="v-arr">→</span><span class="v-after">R590M</span></div>
+            <div class="vsub">recoverable / yr</div>
+          </div>
+        </div>
+
+        <div class="vcard" style="--co:#00829B">
+          <div class="co-logo co-fnb">FNB</div>
+          <div class="vmid">
+            <div class="vname">FNB — Bank</div>
+            <div class="vdom">Digital-banking &amp; VAF application fraud · mule &amp; AML rings</div>
+          </div>
+          <div class="vval">
+            <div class="vflow"><span class="v-before">R180M</span><span class="v-arr">→</span><span class="v-after">R610M</span></div>
+            <div class="vsub">recoverable / yr</div>
+          </div>
+        </div>
+
+        <div class="vcard" style="--co:#FFCB05">
+          <div class="co-logo co-mtn">MTN</div>
+          <div class="vmid">
+            <div class="vname">MTN — Telco</div>
+            <div class="vdom">Revenue-assurance leakage · SIM-box &amp; IRSF · dealer fraud</div>
+          </div>
+          <div class="vval">
+            <div class="vflow"><span class="v-before">R150M</span><span class="v-arr">→</span><span class="v-after">R760M</span></div>
+            <div class="vsub">recoverable / yr</div>
+          </div>
+        </div>
+
+        <div class="vcard" style="--co:#2D6CDF">
+          <div class="co-logo co-momo">MoMo</div>
+          <div class="vmid">
+            <div class="vname">MTN MoMo — Fintech</div>
+            <div class="vdom">Agent/float fraud · SIM-swap takeover · scam rings · 63M users</div>
+          </div>
+          <div class="vval">
+            <div class="vflow"><span class="v-before">R120M</span><span class="v-arr">→</span><span class="v-after">R820M</span></div>
+            <div class="vsub">recoverable / yr</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="strip">
+      <div class="scard hl">
+        <div class="s-ico">🟢</div>
+        <div>
+          <div class="s-val ok" data-count="2.3" data-decimals="1" data-prefix="R" data-suffix="B">R0.0B</div>
+          <div class="s-label">Stays with you — net of our fee</div>
+        </div>
+      </div>
+      <div class="scard">
+        <div class="s-ico">📈</div>
+        <div>
+          <div class="s-val white" data-count="15" data-suffix="–20%">0%</div>
+          <div class="s-label">Our fee — only on what you validate &amp; keep</div>
+        </div>
+      </div>
+      <div class="scard">
+        <div class="s-ico">🛡️</div>
+        <div>
+          <div class="s-val warn" data-count="0" data-prefix="R">R0</div>
+          <div class="s-label">Your downside — find nothing, pay nothing</div>
+        </div>
+      </div>
+    </div>
+
+    <p class="footnote"><span class="synth">Benchmark-derived estimates</span> — OUTsurance FY25 (R5.9bn claims paid) · ICB 2024 (10% claims-fraud benchmark) · SABRIC 2024 (R1.9bn digital-banking fraud) · MTN FY24 (R105bn SA service rev) · TM&nbsp;Forum/Gartner leakage 1.9–5% · GSMA 2024. Not client data; confirmed on each client's own export.</p>
+
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+<script>
+  const chart = echarts.init(document.getElementById('chart'), null, {renderer:'canvas'});
+  const companies = ['OUTsurance','FNB','MTN','MTN MoMo'];
+  const before = [140, 180, 150, 120];
+  const after  = [590, 610, 760, 820];
+
+  chart.setOption({
+    backgroundColor:'transparent',
+    grid:{left:6,right:20,top:46,bottom:6,containLabel:true},
+    legend:{
+      data:['Caught by rules today','Recoverable with the harness'],
+      top:0,left:0,textStyle:{color:'#98A1B3',fontSize:12,fontFamily:'Inter'},
+      icon:'roundRect',itemWidth:11,itemHeight:11,itemGap:20
+    },
+    tooltip:{
+      trigger:'axis',axisPointer:{type:'shadow'},
+      backgroundColor:'#101724',borderColor:'rgba(255,255,255,.1)',
+      textStyle:{color:'#EAEDF4',fontFamily:'Inter'},
+      valueFormatter:v=>'R'+v+'M / yr (estimate)'
+    },
+    xAxis:{
+      type:'category',data:companies,
+      axisLine:{lineStyle:{color:'rgba(255,255,255,.1)'}},axisTick:{show:false},
+      axisLabel:{color:'#EAEDF4',fontSize:13,fontWeight:600,fontFamily:'Inter'}
+    },
+    yAxis:{
+      type:'value',
+      splitLine:{lineStyle:{color:'rgba(255,255,255,.045)'}},
+      axisLabel:{color:'#5E6679',fontSize:11,fontFamily:'Inter',formatter:'R{value}M'}
+    },
+    series:[
+      {
+        name:'Caught by rules today',type:'bar',data:before,barGap:'18%',
+        barWidth:20,itemStyle:{color:'#F87171',borderRadius:[4,4,0,0],opacity:.7},z:2,
+        label:{show:true,position:'top',color:'#F87171',fontWeight:800,fontSize:13,fontFamily:'Inter',formatter:'R{c}M'}
+      },
+      {
+        name:'Recoverable with the harness',type:'bar',data:after,
+        barWidth:20,z:3,
+        itemStyle:{
+          borderRadius:[5,5,0,0],
+          color:new echarts.graphic.LinearGradient(0,0,0,1,[
+            {offset:0,color:'#6EE7B7'},{offset:1,color:'#10B981'}
+          ]),
+          shadowColor:'rgba(52,211,153,.35)',shadowBlur:18,shadowOffsetY:-2
+        },
+        label:{show:true,position:'top',color:'#6EE7B7',fontWeight:800,fontSize:13,fontFamily:'Inter',formatter:'R{c}M'}
+      }
+    ],
+    animationDuration:1500,animationEasing:'cubicOut',animationDelay:i=>i*160
+  });
+  window.addEventListener('resize',()=>chart.resize());
+
+  // count-ups
+  function animateCount(el){
+    const target=+el.dataset.count, prefix=el.dataset.prefix||'', suffix=el.dataset.suffix||'';
+    const dec=+(el.dataset.decimals||0);
+    const dur=1500, start=performance.now();
+    (function tick(now){
+      const p=Math.min((now-start)/dur,1), e=1-Math.pow(1-p,3);
+      el.textContent=prefix+(target*e).toFixed(dec)+suffix;
+      if(p<1) requestAnimationFrame(tick);
+    })(start);
+  }
+  document.querySelectorAll('[data-count]').forEach((el,i)=>setTimeout(()=>animateCount(el),350+i*140));
+</script>
+</body>
+</html>
